@@ -7,6 +7,7 @@ import org.springframework.kafka.core.KafkaTemplate;
 import org.springframework.stereotype.Service;
 
 import com.blogsite.entity.Blogs;
+import com.blogsite.entity.MongoBlogs;
 
 @Service
 public class KafKaProducerService 
@@ -21,12 +22,12 @@ public class KafKaProducerService
 		this.kafkaTemplate.send(topic, blog);
 	}
 	
-	public void findBlogs(List<Blogs> blogs,String topic) 
+	public void findBlogs(List<MongoBlogs> blogs,String topic) 
 	{
 		this.kafkaTemplate.send(topic, blogs);
 	}
 
-	public void searchBlogs(List<Blogs> blogs, String topic) {
+	public void searchBlogs(List<MongoBlogs> blogs, String topic) {
 		this.kafkaTemplate.send(topic, blogs);		
 	}
 	

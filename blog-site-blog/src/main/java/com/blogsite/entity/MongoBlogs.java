@@ -1,6 +1,7 @@
 package com.blogsite.entity;
 
 import java.sql.Timestamp;
+import java.util.Date;
 
 import javax.persistence.Entity;
 import javax.persistence.GeneratedValue;
@@ -19,24 +20,20 @@ import lombok.Setter;
 import lombok.ToString;
 
 
-@Entity
-@Table(	name = "blogs")
+@ToString
+@Document(collection = "blogs")
 @Getter
 @Setter
-public class Blogs {//not a spring bean
+public class MongoBlogs {//not a spring bean
 	
 	@Id
-	@NotNull(message = "Blog Name cannot be blank#######")
-	@Size(min=10, message="Minimum 10 Characters")
 	private String blogname;
 	private String userid;
 	private Category category;
-	@NotNull(message = "Author Name cannot be blank#######")
-	@Size(min=3, message="Minimum 3 Characters")
+	
 	private String authorname;
-	@NotNull(message = "Article cannot be blank#######")
-	@Size(min=10, message="Minimum 10 Characters")
+	
 	private String article;
-	private Timestamp timestamp;
+	private Date timestamp;
 	
 }

@@ -19,6 +19,7 @@ import org.springframework.web.bind.annotation.RestController;
 import com.blogsite.common.AppConstants;
 import com.blogsite.entity.Blogs;
 import com.blogsite.entity.Category;
+import com.blogsite.entity.MongoBlogs;
 import com.blogsite.query.FindAllByCategoryAndRangeQuery;
 import com.blogsite.query.FindAllByCategoryQuery;
 import com.blogsite.repository.BlogRepository;
@@ -46,7 +47,7 @@ public class BlogSearchController extends ErrorController {
 		//List<Blogs> blogs = blogRepository.findAllByCategory(category);
 		FindAllByCategoryQuery findAllByCategoryQuery = new FindAllByCategoryQuery();
 		findAllByCategoryQuery.setCategory(category);
-		List<Blogs> blogs = queryGateway.query(findAllByCategoryQuery, ResponseTypes.multipleInstancesOf(Blogs.class)).join();
+		List<MongoBlogs> blogs = queryGateway.query(findAllByCategoryQuery, ResponseTypes.multipleInstancesOf(MongoBlogs.class)).join();
 		kafkaProducerService.searchBlogs(blogs,AppConstants.TOPIC_SEARCH_BLOG_CAT);
 		if (blogs.isEmpty()) {
 			return new ResponseEntity<Object>("No Blogs Found", HttpStatus.OK);
@@ -65,7 +66,7 @@ public class BlogSearchController extends ErrorController {
 	@GetMapping("/info/{category}/{fromdate}/{todate}")
 	public ResponseEntity<Object> searchByCategoryAndRange(@PathVariable Category category,
 			@PathVariable String fromdate, @PathVariable String todate) {
-		List<Blogs> blogs = new ArrayList<>();
+		List<MongoBlogs> blogs = new ArrayList<>();
 		LocalDate toDate = LocalDate.parse(todate).plusDays(1);
 		//blogs = blogRepository.findAllByCategoryAndTimestampGreaterThanEqualAndTimestampLessThanEqual(category,
 			//	Date.valueOf(fromdate), Date.valueOf(toDate));
@@ -73,7 +74,7 @@ public class BlogSearchController extends ErrorController {
 		findAllByCategoryAndRangeQuery.setCategory(category);
 		findAllByCategoryAndRangeQuery.setFromdate(Date.valueOf(fromdate));
 		findAllByCategoryAndRangeQuery.setTodate(Date.valueOf(toDate));
-		blogs =  queryGateway.query(findAllByCategoryAndRangeQuery, ResponseTypes.multipleInstancesOf(Blogs.class)).join();
+		blogs =  queryGateway.query(findAllByCategoryAndRangeQuery, ResponseTypes.multipleInstancesOf(MongoBlogs.class)).join();
 		kafkaProducerService.searchBlogs(blogs,AppConstants.TOPIC_SEARCH_BLOG_CAT_RANGE);														// blogs ;//= blogRepository.findAll(.)();
 		if (blogs.isEmpty()) {
 			return new ResponseEntity<Object>("No Blogs Found", HttpStatus.OK);

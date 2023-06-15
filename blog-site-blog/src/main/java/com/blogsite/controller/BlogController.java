@@ -27,6 +27,7 @@ import com.blogsite.Utils.JwtUtils;
 import com.blogsite.commands.CreateBlogCommand;
 import com.blogsite.common.AppConstants;
 import com.blogsite.entity.Blogs;
+import com.blogsite.entity.MongoBlogs;
 import com.blogsite.query.DeleteBlogQuery;
 import com.blogsite.query.GetAllBlogsQuery;
 import com.blogsite.query.GetMyBlogsQuery;
@@ -100,9 +101,10 @@ public class BlogController extends ErrorController {
 			String userid= jwtUtils.getUserIdFromJwtToken(jwtToken);
 			Optional<Blogs> blog = blogRepository.findByBlognameAndUserid(blogName,userid);
 			if (blog.isPresent()) {
-				blogRepository.delete(blog.get());
+				
 				DeleteBlogQuery deleteBlogQuery = new DeleteBlogQuery();
 				deleteBlogQuery.setBlog(blog.get());
+				blogRepository.delete(blog.get());
 				queryGateway.query(deleteBlogQuery,String.class);
 				kafkaProducerService.addDelBlog(blog.get(), AppConstants.TOPIC_ADD_BLOG);
 				return new ResponseEntity<Object>("Blog Deleted Success", HttpStatus.OK);
@@ -126,7 +128,7 @@ public class BlogController extends ErrorController {
 			GetMyBlogsQuery getMyBlogsQuery = new GetMyBlogsQuery();
 			
 			getMyBlogsQuery.setUserid(userid);
-			List<Blogs> blogs = queryGateway.query(getMyBlogsQuery, ResponseTypes.multipleInstancesOf(Blogs.class)).join();
+			List<MongoBlogs> blogs = queryGateway.query(getMyBlogsQuery, ResponseTypes.multipleInstancesOf(MongoBlogs.class)).join();
 			//List<Blogs> blogs = blogRepository.findAllByUserid(userid);
 			kafkaProducerService.findBlogs(blogs, AppConstants.TOPIC_FINDMY_BLOGS);
 			return new ResponseEntity<Object>(blogs, HttpStatus.OK);
@@ -142,8 +144,8 @@ public class BlogController extends ErrorController {
 	@GetMapping("/getall")
 	public ResponseEntity<Object> getAllBlogs() {
 		//List<Blogs> blogs = blogRepository.findAll();
-		GetAllBlogsQuery getAllQuery = new GetAllBlogsQuery();
-		List<Blogs> blogs = queryGateway.query(getAllQuery, ResponseTypes.multipleInstancesOf(Blogs.class)).join();
+		GetAllBlogsQuery getAllBlogsQuery = new GetAllBlogsQuery();
+		List<MongoBlogs> blogs = queryGateway.query(getAllBlogsQuery, ResponseTypes.multipleInstancesOf(MongoBlogs.class)).join();
 		kafkaProducerService.findBlogs(blogs, AppConstants.TOPIC_FINDMY_BLOGS);
 		return new ResponseEntity<Object>(blogs, HttpStatus.OK);
 	}
