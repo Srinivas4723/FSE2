@@ -1,11 +1,16 @@
 package com.blogsite.controller;
 
 import java.sql.Timestamp;
+import java.util.List;
 import java.util.Optional;
+import java.util.UUID;
 
 import javax.servlet.http.HttpServletRequest;
 import javax.validation.Valid;
 
+import org.axonframework.commandhandling.gateway.CommandGateway;
+import org.axonframework.messaging.responsetypes.ResponseTypes;
+import org.axonframework.queryhandling.QueryGateway;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
@@ -19,10 +24,15 @@ import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
 
 import com.blogsite.Utils.JwtUtils;
+import com.blogsite.commands.CreateBlogCommand;
+import com.blogsite.common.AppConstants;
 import com.blogsite.entity.Blogs;
+import com.blogsite.query.DeleteBlogQuery;
+import com.blogsite.query.GetAllBlogsQuery;
+import com.blogsite.query.GetMyBlogsQuery;
 import com.blogsite.repository.BlogRepository;
+import com.blogsite.service.KafKaProducerService;
 
-import jdk.internal.org.jline.utils.Log;
 import lombok.extern.slf4j.Slf4j;;
 
 @Slf4j
@@ -34,7 +44,11 @@ public class BlogController extends ErrorController {
 	BlogRepository blogRepository;
 	@Autowired
 	JwtUtils jwtUtils;
-
+	@Autowired KafKaProducerService kafkaProducerService;
+	@Autowired CommandGateway commandGateway;
+	
+	@Autowired QueryGateway queryGateway;
+	
 	/**
 	 * Creating new Blog
 	 * 
@@ -52,7 +66,18 @@ public class BlogController extends ErrorController {
 				Timestamp timestamp = new Timestamp(System.currentTimeMillis());
 				blog.setTimestamp(timestamp);
 				blog.setUserid(jwtUtils.getUserIdFromJwtToken(jwtToken));		
-				blogRepository.save(blog);				  
+				//blogRepository.save(blog);		
+				CreateBlogCommand createBlogCommand = CreateBlogCommand.builder()
+						.blogId(UUID.randomUUID().toString())
+						.blogname(blog.getBlogname())
+						.authorname(blog.getAuthorname())
+						.article(blog.getArticle())
+						.category(blog.getCategory())
+						.timestamp(blog.getTimestamp())
+						.userid(blog.getUserid())
+						.build();
+				commandGateway.sendAndWait(createBlogCommand);
+				kafkaProducerService.addDelBlog(blog, AppConstants.TOPIC_ADD_BLOG);
 				return new ResponseEntity<Object>("Blog added Success", HttpStatus.OK);
 			}
 			return ResponseEntity.badRequest().body("Blog Name already Exist");
@@ -76,6 +101,10 @@ public class BlogController extends ErrorController {
 			Optional<Blogs> blog = blogRepository.findByBlognameAndUserid(blogName,userid);
 			if (blog.isPresent()) {
 				blogRepository.delete(blog.get());
+				DeleteBlogQuery deleteBlogQuery = new DeleteBlogQuery();
+				deleteBlogQuery.setBlog(blog.get());
+				queryGateway.query(deleteBlogQuery,String.class);
+				kafkaProducerService.addDelBlog(blog.get(), AppConstants.TOPIC_ADD_BLOG);
 				return new ResponseEntity<Object>("Blog Deleted Success", HttpStatus.OK);
 			}
 			return new ResponseEntity<Object>("Blog already deleted / not exists", HttpStatus.BAD_REQUEST);
@@ -94,7 +123,13 @@ public class BlogController extends ErrorController {
 		String jwtToken =""+http.getHeader("Authorization");
 		if(jwtUtils.validateJwtToken(jwtToken)) {
 			String userid= jwtUtils.getUserIdFromJwtToken(jwtToken);
-			return new ResponseEntity<Object>(blogRepository.findAllByUserid(userid), HttpStatus.OK);
+			GetMyBlogsQuery getMyBlogsQuery = new GetMyBlogsQuery();
+			
+			getMyBlogsQuery.setUserid(userid);
+			List<Blogs> blogs = queryGateway.query(getMyBlogsQuery, ResponseTypes.multipleInstancesOf(Blogs.class)).join();
+			//List<Blogs> blogs = blogRepository.findAllByUserid(userid);
+			kafkaProducerService.findBlogs(blogs, AppConstants.TOPIC_FINDMY_BLOGS);
+			return new ResponseEntity<Object>(blogs, HttpStatus.OK);
 		}
 		return new ResponseEntity<Object>("UnAuthorised", HttpStatus.UNAUTHORIZED);
 	}
@@ -106,6 +141,10 @@ public class BlogController extends ErrorController {
 	 */
 	@GetMapping("/getall")
 	public ResponseEntity<Object> getAllBlogs() {
-		return new ResponseEntity<Object>(blogRepository.findAll(), HttpStatus.OK);
+		//List<Blogs> blogs = blogRepository.findAll();
+		GetAllBlogsQuery getAllQuery = new GetAllBlogsQuery();
+		List<Blogs> blogs = queryGateway.query(getAllQuery, ResponseTypes.multipleInstancesOf(Blogs.class)).join();
+		kafkaProducerService.findBlogs(blogs, AppConstants.TOPIC_FINDMY_BLOGS);
+		return new ResponseEntity<Object>(blogs, HttpStatus.OK);
 	}
 }

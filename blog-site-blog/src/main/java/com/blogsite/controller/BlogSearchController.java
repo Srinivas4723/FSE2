@@ -5,6 +5,8 @@ import java.time.LocalDate;
 import java.util.ArrayList;
 import java.util.List;
 
+import org.axonframework.messaging.responsetypes.ResponseTypes;
+import org.axonframework.queryhandling.QueryGateway;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
@@ -14,9 +16,13 @@ import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
 
+import com.blogsite.common.AppConstants;
 import com.blogsite.entity.Blogs;
 import com.blogsite.entity.Category;
+import com.blogsite.query.FindAllByCategoryAndRangeQuery;
+import com.blogsite.query.FindAllByCategoryQuery;
 import com.blogsite.repository.BlogRepository;
+import com.blogsite.service.KafKaProducerService;
 
 import lombok.extern.slf4j.Slf4j;
 
@@ -27,7 +33,8 @@ import lombok.extern.slf4j.Slf4j;
 public class BlogSearchController extends ErrorController {
 	@Autowired
 	BlogRepository blogRepository;
-
+	@Autowired KafKaProducerService kafkaProducerService;
+	@Autowired QueryGateway queryGateway;
 	/**
 	 * Search By Category
 	 * 
@@ -36,7 +43,11 @@ public class BlogSearchController extends ErrorController {
 	 */
 	@GetMapping("/info/{category}")
 	public ResponseEntity<Object> searchByCategory(@PathVariable Category category) {
-		List<Blogs> blogs = blogRepository.findAllByCategory(category);
+		//List<Blogs> blogs = blogRepository.findAllByCategory(category);
+		FindAllByCategoryQuery findAllByCategoryQuery = new FindAllByCategoryQuery();
+		findAllByCategoryQuery.setCategory(category);
+		List<Blogs> blogs = queryGateway.query(findAllByCategoryQuery, ResponseTypes.multipleInstancesOf(Blogs.class)).join();
+		kafkaProducerService.searchBlogs(blogs,AppConstants.TOPIC_SEARCH_BLOG_CAT);
 		if (blogs.isEmpty()) {
 			return new ResponseEntity<Object>("No Blogs Found", HttpStatus.OK);
 		}
@@ -56,10 +67,14 @@ public class BlogSearchController extends ErrorController {
 			@PathVariable String fromdate, @PathVariable String todate) {
 		List<Blogs> blogs = new ArrayList<>();
 		LocalDate toDate = LocalDate.parse(todate).plusDays(1);
-		blogs = blogRepository.findAllByCategoryAndTimestampGreaterThanEqualAndTimestampLessThanEqual(category,
-				Date.valueOf(fromdate), Date.valueOf(toDate));// , new
-																// Timestamp(Date.valueOf(todate).getTime()));//,Date.valueOf(todate));//List<Blogs>
-																// blogs ;//= blogRepository.findAll(.)();
+		//blogs = blogRepository.findAllByCategoryAndTimestampGreaterThanEqualAndTimestampLessThanEqual(category,
+			//	Date.valueOf(fromdate), Date.valueOf(toDate));
+		FindAllByCategoryAndRangeQuery findAllByCategoryAndRangeQuery = new FindAllByCategoryAndRangeQuery();
+		findAllByCategoryAndRangeQuery.setCategory(category);
+		findAllByCategoryAndRangeQuery.setFromdate(Date.valueOf(fromdate));
+		findAllByCategoryAndRangeQuery.setTodate(Date.valueOf(toDate));
+		blogs =  queryGateway.query(findAllByCategoryAndRangeQuery, ResponseTypes.multipleInstancesOf(Blogs.class)).join();
+		kafkaProducerService.searchBlogs(blogs,AppConstants.TOPIC_SEARCH_BLOG_CAT_RANGE);														// blogs ;//= blogRepository.findAll(.)();
 		if (blogs.isEmpty()) {
 			return new ResponseEntity<Object>("No Blogs Found", HttpStatus.OK);
 		} else {

@@ -50,9 +50,9 @@ public class BlogControllerTest {
 		
 	@Test
 	public void testAddBlogSuccess() {
-				
+		request.addHeader("Authorization", jwtToken);
 		when(blogRepository.findByBlogname(blog.getBlogname())).thenReturn(Optional.empty());
-		when(jwtUtils.validateJwtToken(jwtToken)).thenReturn(true);
+		when(jwtUtils.validateJwtToken(request.getHeader("Authorization"))).thenReturn(true);
 		when(jwtUtils.getUserIdFromJwtToken(jwtToken)).thenReturn(blog.getUserid());
 		assertEquals(new ResponseEntity<Object>("Blog added Success", HttpStatus.OK),blogController.addBlog(blog,request));
 	}
